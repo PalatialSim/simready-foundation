@@ -152,9 +152,8 @@ class VisualMaterialsCapabilityChecker(BaseRuleChecker):
                     errors.append(f"Invalid material binding scope for direct binding: {target}")
 
         # Check for collection-based bindings
-        collection_bindings = material_binding_api.GetCollectionBindingRel()
-        if collection_bindings:
-            for target in collection_bindings.GetTargets():
+        for collection_binding in material_binding_api.GetCollectionBindingRels():
+            for target in collection_binding.GetTargets():
                 if not self._is_valid_collection_scope(target):
                     errors.append(f"Invalid collection binding scope: {target}")
 
