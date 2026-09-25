@@ -19,7 +19,7 @@ import omni.capabilities as cap
 from pxr import Gf, PhysxSchema, Sdf, Usd, UsdGeom, UsdPhysics
 
 from ... import Requirement
-from ..utils import BaseRuleCheckerWCache
+from ..utils import BaseRuleCheckerWCache, _scale_is_uniform
 
 
 class MultibodyReqs(Requirement, Enum):
@@ -42,25 +42,6 @@ class PhysxRigidBodyColliderReqs(Requirement, Enum):
         "physx-collider-mesh",
         "MeshCollisionAPI may only be applied to a UsdGeom Mesh or to a prim that has PhysxMeshMergeCollisionAPI. CollisionAPI is required whenever MeshCollisionAPI is applied.",
     )
-
-
-def _scale_is_uniform(scale: Gf.Vec3d) -> bool:
-    eps = 1.0e-5
-    # Find min and max scale values
-    if scale[0] < scale[1]:
-        lo, hi = scale[0], scale[1]
-    else:
-        lo, hi = scale[1], scale[0]
-
-    if scale[2] < lo:
-        lo = scale[2]
-    elif scale[2] > hi:
-        hi = scale[2]
-
-    if lo * hi < 0.0:
-        return False  # opposite signs
-
-    return hi - lo <= eps * lo if hi > 0.0 else lo - hi >= eps * hi
 
 
 @omni.asset_validator.core.registerRule("PhysicsRigidBodies")

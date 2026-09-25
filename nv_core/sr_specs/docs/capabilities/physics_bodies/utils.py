@@ -14,7 +14,26 @@
 # limitations under the License.
 import omni.timeline
 from omni.asset_validator.core import BaseRuleChecker
-from pxr import Sdf, Usd, UsdGeom, UsdPhysics, UsdUtils
+from pxr import Gf, Sdf, Usd, UsdGeom, UsdPhysics, UsdUtils
+
+
+def _scale_is_uniform(scale: Gf.Vec3d) -> bool:
+    eps = 1.0e-5
+    # Find min and max scale values
+    if scale[0] < scale[1]:
+        lo, hi = scale[0], scale[1]
+    else:
+        lo, hi = scale[1], scale[0]
+
+    if scale[2] < lo:
+        lo = scale[2]
+    elif scale[2] > hi:
+        hi = scale[2]
+
+    if lo * hi < 0.0:
+        return False  # opposite signs
+
+    return hi - lo <= eps * lo if hi > 0.0 else lo - hi >= eps * hi
 
 
 def get_stage_id(stage: Usd.Stage):
