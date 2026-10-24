@@ -327,57 +327,11 @@ class MetadataLocationChecker(omni.asset_validator.core.BaseRuleChecker):
     """Check NP.006: Metadata location compliance."""
 
     def CheckStage(self, stage: Usd.Stage) -> None:
-        """Check metadata location."""
-        # Get the stage's file path
-        stage_path = stage.GetRootLayer().identifier
-        if not stage_path:
-            return
-
-        # Get the directory containing the USD file
-        current_dir = os.path.dirname(stage_path)
-        if not current_dir:
-            return
-
-        # Get the main USD file name (without extension)
-        main_usd_file = os.path.basename(stage_path)
-        main_usd_name = os.path.splitext(main_usd_file)[0]
-
-        # Check for simready_metadata in custom layer data
-        has_simready_metadata = False
-        root_layer = stage.GetRootLayer()
-        if root_layer:
-            custom_layer_data = root_layer.customLayerData
-            if custom_layer_data and "SimReady_Metadata" in custom_layer_data:
-                has_simready_metadata = True
-
-        # extend to check asset_name, profile, profile_version, source_asset (and that it exists).
-
-        # Check if sidecar JSON file exists
-        sidecar_json_path = os.path.join(current_dir, f"{main_usd_name}.json")
-        has_sidecar_metadata = os.path.exists(sidecar_json_path)
-
-        # Validate sidecar JSON if it exists
-        if has_sidecar_metadata:
-            try:
-                with open(sidecar_json_path, "r") as f:
-                    import json
-
-                    json.load(f)  # Validate JSON format
-            except (json.JSONDecodeError, IOError) as e:
-                self._AddFailedCheck(
-                    requirement=cap.NamingPathsRequirements.NP_006,
-                    message=f"Sidecar JSON file '{sidecar_json_path}' is not valid JSON: {str(e)}",
-                    at=stage,
-                )
-                has_sidecar_metadata = False
-
-        # Check if at least one metadata source exists
-        if not has_sidecar_metadata and not has_simready_metadata:
-            self._AddFailedCheck(
-                requirement=cap.NamingPathsRequirements.NP_006,
-                message=f"Asset '{main_usd_name}' has no metadata. Metadata must be stored in custom layer data as 'simready_metadata' or a sidecar JSON file.",
-                at=stage,
-            )
+        """NP.006: validate the documented metadata locations and values."""
+        from ...annotation_contract import metadata_issues
+        for issue in metadata_issues(stage):
+            self._AddFailedCheck(requirement=cap.NamingPathsRequirements.NP_006,
+                                 message=issue, at=stage)
 
 
 @omni.asset_validator.core.registerRule("NamingPaths")

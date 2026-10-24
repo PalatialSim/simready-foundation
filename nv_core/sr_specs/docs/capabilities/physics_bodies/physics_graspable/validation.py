@@ -15,7 +15,7 @@
 from enum import Enum
 
 import omni.asset_validator.core
-from pxr import Usd, UsdPhysics, UsdShade
+from pxr import Usd, UsdGeom, UsdPhysics, UsdShade
 
 from ... import Requirement
 
@@ -35,41 +35,18 @@ class GraspableVectorLineChecker(omni.asset_validator.core.BaseRuleChecker):
     GRASP_VECTOR_LINE_REQUIREMENT = PhysicsGraspableCapReqs.GSP_001
 
     def CheckStage(self, stage: Usd.Stage) -> None:
+        from ...annotation_contract import grasp_vector_issue
         default_prim = stage.GetDefaultPrim()
         if not default_prim:
-            self._AddFailedCheck("Stage has no default prim, cannot check for graspable prims.", at=stage)
+            self._AddFailedCheck("Stage has no default prim, cannot check grasp vectors.",
+                                 at=stage, requirement=self.GRASP_VECTOR_LINE_REQUIREMENT)
             return
-
-        # Collect all grasp vector prims
-        grasp_vector_prims = []
-        for prim in Usd.PrimRange(default_prim):
-            if prim.GetTypeName() == "BasisCurves" and prim.GetName().startswith("grasp_identifier"):
-                grasp_vector_prims.append(prim)
-        # At least one grasp vector prim
-        if not grasp_vector_prims:
-            self._AddFailedCheck(
-                "Asset must have at least one grasp vector prim.",
-                at=default_prim,
-                requirement=self.GRASP_VECTOR_LINE_REQUIREMENT,
-            )
-            return
-
-        # Each grasp vector prim must have at least 2 points
-        for grasp_prim in grasp_vector_prims:
-            points_attr = grasp_prim.GetAttribute("points")
-            if not points_attr:
-                self._AddFailedCheck(
-                    f"Grasp vector prim '{grasp_prim.GetName()}' is missing 'points' attribute.",
-                    at=grasp_prim,
-                    requirement=self.GRASP_VECTOR_LINE_REQUIREMENT,
-                )
-                continue
-
-            # if < 2 points, fail
-            points = points_attr.Get()
-            if not points or len(points) < 2:
-                self._AddFailedCheck(
-                    f"Grasp vector prim '{grasp_prim.GetName()}' must have at least 2 points, but has {len(points) if points else 0}.",
-                    at=grasp_prim,
-                    requirement=self.GRASP_VECTOR_LINE_REQUIREMENT,
-                )
+        guides = [prim for prim in Usd.PrimRange(default_prim)
+                  if prim.IsA(UsdGeom.BasisCurves) and prim.GetName().startswith("grasp_identifier")]
+        if not guides:
+            self._AddFailedCheck("Asset must have at least one grasp vector prim.",
+                                 at=default_prim, requirement=self.GRASP_VECTOR_LINE_REQUIREMENT)
+        for prim in guides:
+            issue = grasp_vector_issue(stage, prim)
+            if issue:
+                self._AddFailedCheck(issue, at=prim, requirement=self.GRASP_VECTOR_LINE_REQUIREMENT)
