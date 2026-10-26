@@ -17,9 +17,9 @@ When using mimic joints, the mimic relationship, multiplier, and offset values m
 Additional checks:
 
 - Exactly one reference joint target must be set
-- gearing and naturalFrequency must be non-zero; dampingRatio may be zero (info)
+- gearing must be finite and non-zero; naturalFrequency must be finite and nonnegative (zero selects hard coupling); dampingRatio may be zero (info)
 - Both self and reference joints must have limits defined
-- Limits must satisfy inequalities given the gearing sign
+- Finite, ordered follower limits must contain the mapped reference interval: `follower = -gearing * reference - offset`. Equal endpoints are allowed, with float precision tolerance expressed in follower coordinates.
 - Neither the mimic joint nor the reference joint may be excluded from articulation (`physics:excludeFromArticulation` must not be true on either)
 
 ## Why is it required?
@@ -51,7 +51,7 @@ def PhysicsRevoluteJoint "mimic_joint" (
     # Valid mimic relationship
     float physxMimicJoint:rotZ:dampingRatio = 0 # must exist
     float physxMimicJoint:rotZ:gearing = -1 # has to be a non zero real number
-    float physxMimicJoint:rotZ:naturalFrequency = 100 # has to be a natural number
+    float physxMimicJoint:rotZ:naturalFrequency = 100 # finite and nonnegative; zero selects hard coupling
     rel physxMimicJoint:rotZ:referenceJoint = </ref_joint> # has to point to a joint that does not have a mimic api
 }
 

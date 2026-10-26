@@ -14,6 +14,8 @@
 # limitations under the License.
 __all__ = ["PhysicsDrivenJointsValidation"]
 
+import math
+
 from collections import defaultdict
 from enum import Enum
 
@@ -695,22 +697,31 @@ class MimicAPICheck(omni.asset_validator.core.BaseRuleChecker):
                         at=prim,
                     )
 
-                if gear_ratio == 0:
+                if gear_ratio is not None and (not math.isfinite(gear_ratio) or gear_ratio == 0):
                     self._AddFailedCheck(
                         requirement=DrivenJointsCapReq.DJ_007,
-                        message=f"Joint {prim.GetPath()} has gear ratio == 0",
+                        message=f"Joint {prim.GetPath()} has invalid gear ratio",
                         at=prim,
                     )
 
-                if natural_frequency == 0:
+                if natural_frequency is not None and (not math.isfinite(natural_frequency) or natural_frequency < 0):
                     self._AddFailedCheck(
                         requirement=DrivenJointsCapReq.DJ_007,
-                        message=f"Joint {prim.GetPath()} has natural frequency == 0",
+                        message=f"Joint {prim.GetPath()} has invalid natural frequency (zero selects hard coupling)",
                         at=prim,
                     )
 
                 if damping_ratio == 0:
                     self._AddInfo(message=f"Joint {prim.GetPath()} has damping ratio == 0", at=prim)
+
+                if (len(reference_joint) != 1 or gear_ratio is None or
+                        not math.isfinite(gear_ratio) or gear_ratio == 0):
+                    return
+                reference_prim = prim.GetStage().GetPrimAtPath(reference_joint[0])
+                if not reference_prim or not reference_prim.IsA(UsdPhysics.Joint) or reference_prim == prim:
+                    self._AddFailedCheck(requirement=DrivenJointsCapReq.DJ_007,
+                                         message="Mimic reference must be a distinct existing joint", at=prim)
+                    return
 
                 # limit checks
                 self_joint_lower_limit, self_joint_upper_limit = get_prismatic_or_revolute_limits(prim)
@@ -752,44 +763,30 @@ class MimicAPICheck(omni.asset_validator.core.BaseRuleChecker):
                     )
                     return
 
-                # check joint limits
-                # if gear_ratio < 0:
-                # We want:
-                # - reference_lower * gear_ratio > self_lower
-                # - self_upper > reference_upper * gear_ratio
-                # else:
-                # We want:
-                # - reference_lower * gear_ratio < self_upper
-                # - self_lower < reference_upper * gear_ratio
-
-                if gear_ratio < 0:
-                    if not reference_joint_lower_limit * gear_ratio > self_joint_lower_limit:
-                        self._AddFailedCheck(
-                            requirement=DrivenJointsCapReq.DJ_007,
-                            message=f"Joint {prim.GetPath()}'s lower limit ({self_joint_lower_limit}) should be > reference joint limits * gear ratio({reference_joint_lower_limit * gear_ratio})",
-                            at=prim,
-                        )
-
-                    if not self_joint_upper_limit > reference_joint_upper_limit * gear_ratio:
-                        self._AddFailedCheck(
-                            requirement=DrivenJointsCapReq.DJ_007,
-                            message=f"Joint {prim.GetPath()}'s upper limit ({self_joint_upper_limit}) should be < reference joint limits * gear ratio({reference_joint_upper_limit * gear_ratio})",
-                            at=prim,
-                        )
-                else:
-                    if not reference_joint_lower_limit * gear_ratio < self_joint_upper_limit:
-                        self._AddFailedCheck(
-                            requirement=DrivenJointsCapReq.DJ_007,
-                            message=f"Joint {prim.GetPath()}'s lower limit ({self_joint_upper_limit}) should be > reference joint limits * gear ratio({reference_joint_lower_limit * gear_ratio})",
-                            at=prim,
-                        )
-
-                    if not self_joint_lower_limit < reference_joint_upper_limit * gear_ratio:
-                        self._AddFailedCheck(
-                            requirement=DrivenJointsCapReq.DJ_007,
-                            message=f"Joint {prim.GetPath()}'s upper limit ({self_joint_lower_limit}) should be < reference joint limits * gear ratio({reference_joint_upper_limit * gear_ratio})",
-                            at=prim,
-                        )
+                # PhysX: self + gearing * reference + offset = 0.
+                # Equal endpoints are valid; account for float USD precision.
+                offset = mimic_api.GetOffsetAttr().Get() or 0.0
+                values = (self_joint_lower_limit, self_joint_upper_limit,
+                          reference_joint_lower_limit, reference_joint_upper_limit, offset)
+                if (not all(math.isfinite(value) for value in values) or
+                        self_joint_lower_limit >= self_joint_upper_limit or
+                        reference_joint_lower_limit >= reference_joint_upper_limit):
+                    self._AddFailedCheck(requirement=DrivenJointsCapReq.DJ_007,
+                                         message="Mimic limits/offset must be finite with ordered intervals", at=prim)
+                    return
+                mapped = sorted(-gear_ratio * value - offset for value in
+                                (reference_joint_lower_limit, reference_joint_upper_limit))
+                # USD float precision, entirely in follower coordinates.
+                # Scale reference-coordinate rounding through gearing; using
+                # raw degrees here would become metres for a linear follower.
+                reference_scale = abs(gear_ratio) * max(abs(reference_joint_lower_limit),
+                                                        abs(reference_joint_upper_limit))
+                tolerance = 8 * 2**-23 * max(abs(self_joint_lower_limit), abs(self_joint_upper_limit),
+                                             reference_scale + abs(offset))
+                if (mapped[0] < self_joint_lower_limit - tolerance or
+                        mapped[1] > self_joint_upper_limit + tolerance):
+                    self._AddFailedCheck(requirement=DrivenJointsCapReq.DJ_007,
+                                         message="Mimic limits do not contain the mapped reference interval", at=prim)
 
 
 @omni.asset_validator.core.registerRule("PhysicsDrivenJoints")
