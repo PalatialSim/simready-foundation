@@ -1,5 +1,14 @@
 # SimReady Foundation
 
+## Portable annotation checks in the Palatial pin
+
+Grasp segments may intersect a visible surface or lie inside a verified closed
+mesh, as they can inside a primitive solid. Mesh bounds alone do not establish
+containment: open shells, declared holes and nested cavity shells retain their
+empty space. This annotation check does not qualify a physical robot grasp.
+With OpenUSD and pytest installed, run `python -m pytest -q tests` for the portable
+regressions; the geometry tests do not require Omniverse or asset downloads.
+
 ## Getting the repository
 
 This repository uses **Git LFS** to track binary and USD asset files (`.usda`, `.usdc`, `.usd`, `.usdz`, images, and others). You must have Git LFS installed before cloning, otherwise those files will check out as tiny pointer files instead of the real content.
