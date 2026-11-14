@@ -41,30 +41,19 @@ class PhysicsMaterialsCapabilityChecker(omni.asset_validator.core.BaseRuleChecke
 
         for prim in Usd.PrimRange(default_prim):
             if prim.HasAPI(UsdPhysics.CollisionAPI):
-                # prim must also have a material binding through material:binding:physics
-                material_binding = prim.GetRelationship("material:binding:physics")
-                if not material_binding:
+                # USD resolves bindings through ancestors and collections, including
+                # binding strength. Do not confuse all-purpose fallback with an
+                # explicit physics-purpose binding required by PMT.001.
+                material, binding = UsdShade.MaterialBindingAPI(prim).ComputeBoundMaterial(
+                    materialPurpose="physics"
+                )
+                name = str(binding.GetName()) if binding else ""
+                physics_binding = name == "material:binding:physics" or name.startswith(
+                    "material:binding:collection:physics:"
+                )
+                if not physics_binding or not material or not material.GetPrim().HasAPI(UsdPhysics.MaterialAPI):
                     self._AddFailedCheck(
-                        "Prim has a collision API but no material binding through material:binding:physics.",
-                        at=prim,
-                        requirement=self.COLLISION_API_MATERIAL_BINDING_REQUIREMENT,
-                    )
-                    return
-
-                # material binding must be a valid material
-                material_path = material_binding.GetTargets()
-                if not material_path:
-                    self._AddFailedCheck(
-                        "Prim has a collision API but no material binding through material:binding:physics.",
-                        at=prim,
-                        requirement=self.COLLISION_API_MATERIAL_BINDING_REQUIREMENT,
-                    )
-                    return
-
-                material_prim = stage.GetPrimAtPath(material_path[0])
-                if not material_prim or not material_prim.IsA(UsdShade.Material):
-                    self._AddFailedCheck(
-                        "Prim has a collision API but no valid material binding through material:binding:physics.",
+                        "Prim has a collision API but no valid physics material binding through material:binding:physics.",
                         at=prim,
                         requirement=self.COLLISION_API_MATERIAL_BINDING_REQUIREMENT,
                     )

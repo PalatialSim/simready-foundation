@@ -48,8 +48,8 @@ def Material "Metal" (
 
 ## How to comply
 
-1. Ensure every prim with PhysicsCollisionAPI has a `material:binding:physics` relationship
-2. The relationship must target a valid physics material prim (with PhysicsMaterialAPI)
+1. Ensure every prim with PhysicsCollisionAPI resolves a `material:binding:physics` relationship, authored directly or inherited through USD binding resolution
+2. The resolved relationship must target a valid physics material prim (with PhysicsMaterialAPI)
 3. Physics materials should have appropriate values for density, friction, and restitution
 4. Use meaningful material names that reflect the intended physical properties
 
