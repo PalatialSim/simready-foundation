@@ -107,6 +107,36 @@ def _segment_polygon(a, b, vertices):
     return -1e-9 <= t <= 1+1e-9 and _inside_polygon(a+t*(b-a), vertices, normal)
 
 
+def _segment_surface(a, b, vertices):
+    """Handle convex warped quads only when both possible diagonals agree.
+
+    USD polygon surfaces may be warped. A hit common to both triangulations
+    is robust to the renderer's diagonal choice. Concave, degenerate and
+    larger nonplanar polygons remain unproven rather than filling their bounds.
+    """
+    if _polygon_normal(vertices) is not None:
+        return _segment_polygon(a, b, vertices)
+    if len(vertices) != 4:
+        return False
+    # Require a consistently convex, nondegenerate projection onto the
+    # dominant Newell-normal plane before considering either triangulation.
+    normal = Gf.Vec3d(0)
+    for p, q in zip(vertices, vertices[1:] + vertices[:1]):
+        normal += Gf.Cross(p, q)
+    if normal.GetLength() < 1e-12:
+        return False
+    axis = max(range(3), key=lambda i: abs(normal[i]))
+    x, y = [i for i in range(3) if i != axis]
+    turns = []
+    for p, q, r in zip(vertices, vertices[1:] + vertices[:1], vertices[2:] + vertices[:2]):
+        turns.append((q[x]-p[x])*(r[y]-q[y]) - (q[y]-p[y])*(r[x]-q[x]))
+    if not (all(v > 1e-14 for v in turns) or all(v < -1e-14 for v in turns)):
+        return False
+    v = vertices
+    return (any(_segment_polygon(a,b,[v[i] for i in tri]) for tri in ((0,1,2),(0,2,3)))
+            and any(_segment_polygon(a,b,[v[i] for i in tri]) for tri in ((0,1,3),(1,2,3))))
+
+
 def _segment_box(a, b, lo, hi):
     start, end = 0., 1.
     for axis in range(3):
@@ -222,7 +252,7 @@ def _intersects(stage, a, b, guide):
         elif prim.IsA(UsdGeom.Mesh):
             mesh = UsdGeom.Mesh(prim)
             faces = _mesh_faces(mesh)
-            if (any(_segment_polygon(local_a, local_b, vertices) for vertices in faces)
+            if (any(_segment_surface(local_a, local_b, vertices) for vertices in faces)
                     or _closed_mesh_contains(faces, local_a)):
                 return True
     return False
