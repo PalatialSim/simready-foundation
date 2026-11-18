@@ -5,7 +5,7 @@ import types
 from pathlib import Path
 
 import pytest
-from pxr import Usd, UsdGeom, UsdShade
+from pxr import Sdf, Usd, UsdGeom, UsdShade
 
 
 @pytest.fixture
@@ -53,3 +53,22 @@ def test_direct_and_named_collection_bindings_are_checked(checker, collection_co
     checker._is_valid_collection_scope = lambda target: (seen.append(target), original(target))[1]
     assert checker.check_vm_bind_001_material_bind_scope(stage, str(prim.GetPath())) == []
     assert seen == expected_targets
+
+
+@pytest.mark.parametrize(("value", "invalid"), [(0.25, False), (float("inf"), True), (float("nan"), True)])
+def test_mdl_shader_input_types_and_nonfinite_floats(checker, value, invalid):
+    stage = Usd.Stage.CreateInMemory()
+    shader = UsdShade.Shader.Define(stage, "/Asset/Shader")
+    prim = shader.GetPrim()
+    prim.CreateAttribute("info:mdl:sourceAsset", Sdf.ValueTypeNames.Asset).Set(Sdf.AssetPath("test.mdl"))
+    prim.CreateAttribute("info:mdl:sourceAsset:subIdentifier", Sdf.ValueTypeNames.Token).Set("surface")
+    shader.CreateInput("roughness", Sdf.ValueTypeNames.Float).Set(value)
+    shader.CreateInput("enabled", Sdf.ValueTypeNames.Bool).Set(True)
+    checker._cache_mdl_specs = {"test.mdl||||surface": {
+        "roughness": Sdf.ValueTypeNames.Float, "enabled": Sdf.ValueTypeNames.Bool}}
+    failures = []
+    checker._AddFailedCheck = lambda **issue: failures.append(issue)
+    errors = checker._validate_mdl_shader_inputs(prim, shader, stage, str(prim.GetPath()))
+    assert len(errors) == len(failures) == int(invalid)
+    if invalid:
+        assert "Invalid float value for roughness" in errors[0]

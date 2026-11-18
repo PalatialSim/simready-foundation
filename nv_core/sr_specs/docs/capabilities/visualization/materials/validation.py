@@ -634,7 +634,7 @@ class VisualMaterialsCapabilityChecker(BaseRuleChecker):
                         errors.append(f"Type mismatch for {input_name}: {actual_type} vs {expected_type}")
 
                     # Check for NaN and Inf in float values
-                    if actual_type.type == Sdf.ValueTypeNames.Float:
+                    if actual_type == Sdf.ValueTypeNames.Float:
                         value = shader_input.Get()
                         if value is not None and (math.isnan(value) or math.isinf(value)):
                             self._AddFailedCheck(
