@@ -20,6 +20,7 @@ import asyncio
 import os
 import re
 from datetime import datetime
+from itertools import chain
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -521,11 +522,11 @@ class PathsExistChecker(omni.asset_validator.core.BaseRuleChecker):
                     if not primspec or not primspec.referenceList:
                         continue
 
-                    items = (
-                        primspec.referenceList.explicitItems
-                        + primspec.referenceList.prependedItems
-                        + primspec.referenceList.addedItems
-                        + primspec.referenceList.appendedItems
+                    items = chain(
+                        primspec.referenceList.explicitItems,
+                        primspec.referenceList.prependedItems,
+                        primspec.referenceList.addedItems,
+                        primspec.referenceList.appendedItems,
                     )
 
                     for item in items:
@@ -544,11 +545,11 @@ class PathsExistChecker(omni.asset_validator.core.BaseRuleChecker):
                     if not primspec or not primspec.payloadList:
                         continue
 
-                    items = (
-                        primspec.payloadList.explicitItems
-                        + primspec.payloadList.prependedItems
-                        + primspec.payloadList.addedItems
-                        + primspec.payloadList.appendedItems
+                    items = chain(
+                        primspec.payloadList.explicitItems,
+                        primspec.payloadList.prependedItems,
+                        primspec.payloadList.addedItems,
+                        primspec.payloadList.appendedItems,
                     )
 
                     for item in items:
